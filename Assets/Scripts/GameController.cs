@@ -31,6 +31,9 @@ public class GameController : MonoBehaviour
 
         consumable.Add(healthGameObject);
         consumable.Add(ammoGameObject);
+        consumable.Add(ammoGameObject);
+        consumable.Add(fuelGameObject);
+        consumable.Add(fuelGameObject);
         consumable.Add(fuelGameObject);
 
         foreach (GameObject cons in consumable)
@@ -39,7 +42,7 @@ public class GameController : MonoBehaviour
         }
 
         StartCoroutine(GameStart(gameStartTime));
-        StartCoroutine(GenerateRandomConsumable());
+        StartCoroutine("GenerateRandomConsumable");
 
         GameObject[] aiTanksTemp = GameObject.FindGameObjectsWithTag("Tank");
         for (int i = 0; i < aiTanksTemp.Length; i++)
@@ -54,17 +57,18 @@ public class GameController : MonoBehaviour
         gameStarted = true;
     }
 
-        IEnumerator GenerateRandomConsumable()
+    IEnumerator GenerateRandomConsumable()
     {
         foreach (GameObject cons in consumable)
         {
             cons.SetActive(false);
         }
 
-        yield return new WaitForSeconds(Random.Range(2f, 12f));
-        Node randomNode = aStar.NodePositionInGrid(new Vector3(Random.Range(-95, 95), 0, Random.Range(-95, 95)));
+        yield return new WaitForSeconds(Random.Range(2f, 10f));
+        Node randomNode = aStar.NodePositionInGrid(new Vector3(Random.Range(-92, 92), 0, Random.Range(-92, 92)));
         Vector3 consPos = Vector3.zero;
-        while (!randomNode.traversable)
+        while (!randomNode.traversable || (randomNode.x > -35 && randomNode.x < 35) 
+            || (randomNode.y > -37 && randomNode.y < 37))
         {
             randomNode = aStar.NodePositionInGrid(new Vector3(Random.Range(-95, 95), 0, Random.Range(-95, 95)));
 
@@ -78,14 +82,17 @@ public class GameController : MonoBehaviour
 
         yield return new WaitForSeconds(1f);
 
-
         consumable[randCons].SetActive(true);
 
+        yield return new WaitForSeconds(Random.Range(45f, 60f));
 
-        yield return new WaitForSeconds(Random.Range(15f, 20f));
+        StartCoroutine("GenerateRandomConsumable");
+    }
 
-        StartCoroutine(GenerateRandomConsumable());
-
+    public void ConsumableCollection()
+    {
+        StopCoroutine("GenerateRandomConsumable");
+        StartCoroutine("GenerateRandomConsumable");
     }
 
     private void Update()
@@ -101,7 +108,6 @@ public class GameController : MonoBehaviour
             if(aiTanksTemp.Count == 1)
             {
                 break;
-
             }
         }
 

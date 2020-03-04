@@ -31,15 +31,15 @@ public class CameraController : MonoBehaviour
             aiTanks.Add(aiTanksTemp[i].GetComponent<AITank>());
         }
     }
-             public Transform target;
-         public float smoothTime = 0.3F;
-         private Vector3 velocity = Vector3.zero;
+
+    public Transform target;
+    public float smoothTime = 0.3F;
+    private Vector3 velocity = Vector3.zero;
 
     void LateUpdate()
     {
-        if (currentlyVeiwing != 0)
+        if (currentlyVeiwing > 0)
         {
-
             if(aiTanks[currentlyVeiwing-1] != null)
             {
                 Vector3 targetPos = GetTargetPos();
@@ -47,13 +47,10 @@ public class CameraController : MonoBehaviour
                 float t = Vector3.Distance(myTransform.position, targetPos) / maxDriftRange;
 
                 //smooth camera position using drift theta
-                // myTransform.position = Vector3.Lerp(myTransform.position, targetPos, t * Time.deltaTime);
                 myTransform.position = Vector3.SmoothDamp(transform.position, targetPos, ref velocity, smoothTime);
                 //look at our targetPos
                 myTransform.LookAt(target);
             }
-
-
         }
 
         if (Input.GetKeyDown(KeyCode.Space))
@@ -89,6 +86,7 @@ public class CameraController : MonoBehaviour
             else if (aiTanks[currentlyVeiwing - 1] == null)
             {
                 aiTanks.RemoveAt(currentlyVeiwing - 1);
+                currentlyVeiwing = aiTanks.Count - 1;
             }
             mapCam.SetActive(true);
 

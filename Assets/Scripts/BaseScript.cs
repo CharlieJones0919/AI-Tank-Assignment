@@ -7,19 +7,24 @@ public class BaseScript : MonoBehaviour
     bool baseHit = false;
     private ParticleSystem destroyPart;
     private GameObject modelGO;
-
+    private Rigidbody rBody;
+    private BoxCollider bCollider;
     private void Start()
     {
         destroyPart = transform.Find("DestroyParticle").GetComponent<ParticleSystem>();
         modelGO = transform.Find("Model").gameObject;
-
+        rBody = GetComponent<Rigidbody>();
+        bCollider = GetComponent<BoxCollider>();
+        rBody.isKinematic = true;
+        bCollider.isTrigger = true;
     }
 
-    private void OnCollisionEnter(Collision collision)
+    private void OnTriggerEnter(Collider collision)
     {
         if (collision.gameObject.tag == "Projectile" && baseHit == false)
         {
-            print("Base has been hit!");
+            bCollider.isTrigger = false;
+            print(this.transform.parent.gameObject.name + " base has been hit!");
             baseHit = true;
             StartCoroutine(BaseDestroyed());
             modelGO.SetActive(false);

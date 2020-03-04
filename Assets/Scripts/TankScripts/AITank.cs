@@ -5,8 +5,6 @@ using UnityEngine;
 
 public abstract class AITank : MonoBehaviour
 {
-
-
     private float fuel = 100f;
     private float fuelMax = 125f;
     private int ammo;
@@ -42,10 +40,8 @@ public abstract class AITank : MonoBehaviour
     [Range(0, 360)]
     private float viewAngle;
 
-
     private AudioSource engineSound;
     private AudioSource fireSound;
-
 
     private LayerMask tankMainMask;
     private LayerMask obstacleMask;
@@ -67,6 +63,7 @@ public abstract class AITank : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        //References
         gameControllerScript = GameObject.Find("GameController").GetComponent<GameController>();
         TankExplosionParticle = GameObject.Find("GameController").transform.Find("TankExplosionParticle").GetComponent<ParticleSystem>();
         projectileObject = GameObject.Find("Projectile").gameObject;
@@ -83,36 +80,40 @@ public abstract class AITank : MonoBehaviour
         turretStartRot = turretObject.transform.localRotation;
         engineSound = GetComponent<AudioSource>();
         fireSound = transform.Find("FireSound").GetComponent<AudioSource>();
-
+  
+        //Search for friendly bases.
         BaseScript[] basesScript = transform.parent.GetComponentsInChildren<BaseScript>();
-
+        //Store bases in a list. 
         foreach (var item in basesScript)
         {
             myBases.Add(item.gameObject);
         }
 
+        //Sensor values.
         viewRadius = 55;
         viewAngle = 160;
+        sensorPoint = turretObject;
 
+        //Tank speed setup.
         tankMaxSpeed = 20f;
         tankMaxSpeedHolder = tankMaxSpeed;
 
+        //Tank stats setup.
         ammo = 12;
         fuel = 100f;
         health = 100f;
 
-
-        sensorPoint = turretObject;
-
-        //Abstact Function 
-        AITankStart();
-
+        //Layer mask references.
         tankMainMask = LayerMask.GetMask("TankMain");
         obstacleMask = LayerMask.GetMask("Obstacle");
         consumableMask = LayerMask.GetMask("Consumable");
         baseMask = LayerMask.GetMask("Base");
 
-        StartCoroutine(TargetsFind(0.2f));
+        //Search targets
+        StartCoroutine(TargetsFind(0.2f));        
+        
+        //Abstact Start Function, must be implemented in derived class. 
+        AITankStart();
     }
 
     // Update is called once per frame
@@ -121,47 +122,54 @@ public abstract class AITank : MonoBehaviour
         //Particles
         smokePartEmission.rateOverTime = Mathf.Abs(((rb.velocity.x + rb.velocity.y + rb.velocity.z) / 3f) * 10f);
 
-        //Fuel Depletion
+        //Fuel depletion
         fuel -= Mathf.Abs(((rb.velocity.x + rb.velocity.y + rb.velocity.z) / 3f) * 0.003f);
+        //Idle fuel depletion
         fuel -= 0.001f;
+        //Fuel level sprite
         fuelSprite.size = new Vector2(fuelSprite.size.x, Mathf.Lerp(0, 1.7f, Mathf.InverseLerp(0, fuelMax, fuel)));
+        //Fuel empty message
         if (fuel <= 0)
         {
             print(this.transform.parent.gameObject.name + " has no Fuel!");
+            destroyed = true;
+            StartCoroutine(DestroyWait());
+            rb.isKinematic = true;
         }
 
-        //ammo depletion
+        //Ammo level sprite
         ammoSprite.size = new Vector2(ammoSprite.size.x, Mathf.Lerp(0, 1.7f, Mathf.InverseLerp(0, ammoMax, ammo)));
 
-        //Health 
+        //Health level sprite
         healthSprite.size = new Vector2(healthSprite.size.x, Mathf.Lerp(0, 1.7f, Mathf.InverseLerp(0, healthMax, health)));
-
+        //Health depleted, destroy tank
         if (health <= 0)
         {
             destroyed = true;
             print(this.transform.parent.gameObject.name + " has been destroyed!");
             StartCoroutine(DestroyWait());
+            rb.isKinematic = true;
         }
 
 
-        //sound
+        //Tank movement sound
         engineSound.pitch = Mathf.Abs(((Mathf.Abs(rb.velocity.x) + Mathf.Abs(rb.velocity.y) + Mathf.Abs(rb.velocity.z)) / 3f) * 0.12f + 0.3f); 
 
-        //Abstract Function
+        //Abstract Update Function
         AITankUpdate();
     }
 
-
-
-
+    //Destroy function.
     IEnumerator DestroyWait()
     {
-
         yield return new WaitForSeconds(3f);
         GameObject.Instantiate((GameObject)TankExplosionParticle.gameObject, transform.position, Quaternion.identity).GetComponent<ParticleSystem>().Play();
         Destroy(this.gameObject);
     }
 
+    /// <summary>
+    /// Check for collisions.
+    /// </summary>
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.tag == "Projectile")
@@ -177,6 +185,7 @@ public abstract class AITank : MonoBehaviour
             health = Mathf.Clamp(health + 25f, 0f, healthMax);
             print(this.transform.parent.gameObject.name + " has collected Health!");
             collision.gameObject.SetActive(false);
+            gameControllerScript.ConsumableCollection();
         }
 
         if (collision.gameObject.tag == "Ammo")
@@ -184,17 +193,16 @@ public abstract class AITank : MonoBehaviour
             ammo = Mathf.Clamp(ammo + 3, 0, ammoMax);
             print(this.transform.parent.gameObject.name + " has collected Ammo!");
             collision.gameObject.SetActive(false);
+            gameControllerScript.ConsumableCollection();
         }
-
 
         if (collision.gameObject.tag == "Fuel")
         {
             fuel = Mathf.Clamp(fuel + 30f, 0f, fuelMax);
             print(this.transform.parent.gameObject.name + " has collected Fuel!");
             collision.gameObject.SetActive(false);
+            gameControllerScript.ConsumableCollection();
         }
-
-
 
         if (collision.gameObject.tag == "Obstacle")
         {
@@ -202,7 +210,6 @@ public abstract class AITank : MonoBehaviour
             {
                 StartCoroutine(CollisionWithObstacle());
             }
-
         }
 
         if (collision.gameObject.tag == "ObstacleRock")
@@ -211,7 +218,6 @@ public abstract class AITank : MonoBehaviour
             {
                 StartCoroutine(CollisionWithObstacleRock());
             }
-
         }
 
         AIOnCollisionEnter(collision);
@@ -221,21 +227,17 @@ public abstract class AITank : MonoBehaviour
     IEnumerator CollisionWithObstacle()
     {
         collisionWithObstacle = true;
-        yield return new WaitForSeconds(1.4f);
+        yield return new WaitForSeconds(1f);
         collisionWithObstacle = false;
-        yield return new WaitForSeconds(5f);
-
-
+        yield return new WaitForSeconds(4f);
     }
 
     IEnumerator CollisionWithObstacleRock()
     {
         collisionWithObstacleRock = true;
-        yield return new WaitForSeconds(2.5f);
+        yield return new WaitForSeconds(2f);
         collisionWithObstacleRock = false;
-        yield return new WaitForSeconds(5f);
-
-
+        yield return new WaitForSeconds(4f);
     }
 
     IEnumerator ProjectileHit()
@@ -243,28 +245,34 @@ public abstract class AITank : MonoBehaviour
         projectileHit = true;
         health -= 15f;
         print(this.transform.parent.gameObject.name + " has been hit!");
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
         projectileHit = false;
         yield return new WaitForSeconds(0.5f);
-
-
     }
 
-    //Request a path from this to pointInWorld;
+    /// <summary>
+    /// Request a path from this to pointInWorld
+    /// </summary>
     public void FindPathTo(GameObject pointInWorld)
     {
+        //Path holder
         List<Node> path = new List<Node>();
 
+        //Find path if pointInWorld or fuel are not null
         if (pointInWorld != null && fuel > 0)
         {
+            //AStar scipt holder.
             AStar tempAStar = aStarScript;
-
+            //Request path to pointInWorldGameObject
             path = tempAStar.RequestPath(this.gameObject, pointInWorld);
         }
 
+        //If path is not null and more than 3
         if (path != null && path.Count > 3)
         {
+            //Clear old pathFound
             pathFound.Clear();
+            //Populate pathFound with path
             foreach (Node item in path)
             {
                 pathFound.Add(item.nodePos);
@@ -273,26 +281,34 @@ public abstract class AITank : MonoBehaviour
     }
 
 
-
-    //Follow path to a target
+    /// <summary>
+    ///Follow path to a target (GameObject) at speed (value between 0-1)
+    /// </summary>
     public void FollowPathToPointInWorld(GameObject pointInWorld, float normalizedSpeed)
     {
+        //Random position not found.
         randomNodeFound = true;
 
+        //Set speed of tank based on normalized speed.
         float speed = Mathf.Lerp(0f, moveSpeed, normalizedSpeed);
 
+        //If not firing and fuel is more than 0.
         if (!firing && fuel > 0)
         {
+            //If pointInWorld is not null.
             if(pointInWorld != null)
             {
-                //Request Path
+                //Request Path to pointInWorld.
                 FindPathTo(pointInWorld);
             }
-            if (pathFound != null)
+
+            //If pathFound is not null
+            if (pathFound != null && !destroyed)
             {
+                //Move the tank over the path, at set speed.
                 MoveTank(pathFound, speed);
             }
-
+       
             if (pointInWorld != null)
             {
                 FaceTurretToPointInWorld(pointInWorld.transform.position);
@@ -301,31 +317,39 @@ public abstract class AITank : MonoBehaviour
 
     }
 
-
+    /// <summary>
+    /// Follow path to a random target (GameObject) at speed (value between 0-1)
+    /// </summary>
     public void FollowPathToRandomPoint(float normalizedSpeed)
     {
+        //Set speed of tank.
         float speed = Mathf.Lerp(0f, moveSpeed, normalizedSpeed);
 
+        //If tank has found the randomNode.
         if (randomNodeFound)
         {
             StartCoroutine(GenerateRandomPointInWorld());
             FindPathTo(randomPoint);
-
         }
 
-        if (!firing && fuel > 0)
+        //Move tank tank if not firing and has fuel.
+        if (!firing && fuel > 0 && !destroyed)
         {
             FindPathTo(randomPoint);
             TurretReset();
             MoveTank(pathFound, speed);
         }
 
-        if (Vector3.Distance(transform.position, randomPoint.transform.position) < 12)
+        //Found randomNode if distance is less than 12
+        if (Vector3.Distance(transform.position, randomPoint.transform.position) < 14f)
         {
             randomNodeFound = true;
         }    
     }
 
+    /// <summary>
+    /// Set another random point.
+    /// </summary>
     public void FindAnotherRandomPoint()
     {
         randomNodeFound = true;
@@ -335,15 +359,16 @@ public abstract class AITank : MonoBehaviour
     {
         AStar tempAStar = aStarScript;
 
-
         Node randomNode = tempAStar.NodePositionInGrid(new Vector3(Random.Range(-90, 90), 0, Random.Range(-90, 90)));
         Vector3 consPos = Vector3.zero;
+
         while (!randomNode.traversable)
         {
             randomNode = tempAStar.NodePositionInGrid(new Vector3(Random.Range(-90, 90), 0, Random.Range(-90, 90)));
 
             yield return new WaitForEndOfFrame();
         }
+
         randomNodeFound = false;
         randomPoint.transform.position = randomNode.nodePos;
     }
@@ -391,30 +416,37 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Turn tank to position in world.
+    /// </summary>
     void TankLookAt(Vector3 pos)
     {
-        transform.LookAt(Vector3.SmoothDamp(transform.position, pos, ref velocityRot, 7f));
+        transform.LookAt(Vector3.SmoothDamp(transform.position, pos, ref velocityRot, 1.7f));
     }
 
+    /// <summary>
+    /// Stop tank
+    /// </summary>
     public void StopTank()
     {
         tankMaxSpeed = tankMaxSpeedHolder * 0.3f;
-
     }
 
-
+    /// <summary>
+    /// Start tank
+    /// </summary>
     public void StartTank()
     {
         tankMaxSpeed = tankMaxSpeedHolder;
-
     }
-
 
     private Vector3 velocityTurretRot;
     private bool projectileHit;
     private bool collisionWithObstacleRock;
 
-    //Face turret to target
+    /// <summary>
+    /// Face turret to pointInWorld
+    /// </summary>
     public void FaceTurretToPointInWorld(Vector3 pointInWorld)
     {
         Vector3 faceTarget = new Vector3(pointInWorld.x, pointInWorld.y, pointInWorld.z);
@@ -422,44 +454,58 @@ public abstract class AITank : MonoBehaviour
         faceTarget = Vector3.SmoothDamp(turretObject.transform.position, faceTarget, ref velocityTurretRot, turrentRotationSpeed);
 
         turretObject.transform.LookAt(faceTarget);
-
     }
 
-
-
-
+    /// <summary>
+    /// Reset turret
+    /// </summary>
     public void TurretReset()
     {
         turretObject.transform.localRotation = turretStartRot;
     }
 
-
-
-
+    /// <summary>
+    /// Fire at pointInWorld
+    /// </summary>
     public void FireAtPointInWorld(GameObject pointInWorld)
     {
+        //Stop Tank.
         StopTank();
+
+        //Set RandomNodeFound to true.
         randomNodeFound = true;
-        if (!firing && ammo > 0)
+
+        //If not firing and have ammo.
+        if (!firing && ammo > 0 && !destroyed)
         {
+            //Set firing to true.
             firing = true;
+            //Start firing process.
             StartCoroutine(Fire(pointInWorld));
         }
         else if (ammo <= 0)
         {
+            //If there is no ammo print message.
             print(this.transform.parent.gameObject.name + " has no Ammo!");
         }
     }
 
+    /// <summary>
+    /// Fire at pointInWorld (target)
+    /// </summary>
     IEnumerator Fire(GameObject target)
-    {
-        
-        float tWait = 1.2f;
+    {    
+        //Fire waiting time.
+        float tWait = 2f;
 
+        //While waiting time more than 0, and target exists and ammo is more than 0
         while (tWait > 0 && target != null && ammo > 0)
         {
+            //Face turret to target.
             FaceTurretToPointInWorld(target.transform.position);
+            //decrement wait time.
             tWait -= Time.deltaTime;
+            //if ammo is 0, break out of while loop.
             if(ammo == 0)
             {
                 break;
@@ -467,48 +513,61 @@ public abstract class AITank : MonoBehaviour
             yield return null;
         }
 
+        //Play fire particle 
         fireParticle.Play();
+        //Play fire sound.
         if (fireSound.isPlaying)
         {
             fireSound.Stop();
         }
         fireSound.Play();
+
+        //Decrement ammo amount.
         ammo -= 1;
+
+        //Print fire message
         print(this.transform.parent.gameObject.name + " has Fired!");
 
+        //Fine position of turret
         Vector3 turPart = turretObject.transform.Find("TurretPart").position;
+        //Position to fire projectile from turret.
         Rigidbody bulletClone = (Rigidbody)Instantiate(projectileObject.GetComponent<Rigidbody>(), new Vector3(turPart.x + 0.55f, turPart.y + 1.7f, turPart.z)
-                                                                                                            , turretObject.transform.rotation);
+                                                                                     , turretObject.transform.rotation);
+        //Allow for projectile to move. 
         bulletClone.isKinematic = false;
-
+        //Add force to bullet projectile.
         bulletClone.AddRelativeForce(projectileForce, ForceMode.Impulse);
+        
+        //Wait time set
+        tWait = 1f;
 
-        tWait = 1;
-
+        //Wait
         while (tWait > 0)
         {
             tWait -= Time.deltaTime;
             yield return null;
         }
 
+        //Fireing is now false.
         firing = false;
-
     }
 
+    /// <summary>
+    /// Find centre point of first 5 nodes of path
+    /// </summary>
     private Vector3 FindCentre(List<Vector3> _path)
     {
         float x = 0;
         float y = 0;
         float z = 0;
 
-        int pathCount = Mathf.Clamp(_path.Count, 0, 5);
+        int pathCount = Mathf.Clamp(_path.Count, 0, 4);
 
         for (int i = 0; i < pathCount; i++)
         {
             x += _path[i].x;
             y += this.transform.position.y;
             z += _path[i].z;
-
         }
 
         x = x / pathCount;
@@ -520,12 +579,13 @@ public abstract class AITank : MonoBehaviour
         return centrePosNew;
     }
 
-    //Sensor Stuff
+    /// <summary>
+    /// Delay sensor 
+    /// </summary>
     IEnumerator TargetsFind(float delay)
     {
         while (true)
         {
-
             yield return new WaitForSeconds(delay);
             targetsFound.Clear();
             consumablesFound.Clear();
@@ -534,10 +594,11 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Find visible targets (Tanks, Bases and Consumables.
+    /// </summary>
     void FindVisibleTargets()
     {
-
-
         Collider[] targetsInViewRadius = Physics.OverlapSphere(sensorPoint.transform.position, viewRadius, tankMainMask);
         Collider[] consumableInViewRadius = Physics.OverlapSphere(sensorPoint.transform.position, viewRadius, consumableMask);
         Collider[] baseInViewRadius = Physics.OverlapSphere(sensorPoint.transform.position, viewRadius, baseMask);
@@ -547,7 +608,6 @@ public abstract class AITank : MonoBehaviour
             GameObject target = targetsInViewRadius[i].gameObject;
 
             Vector3 directionToTarget = (target.transform.position - sensorPoint.transform.position).normalized;
-
 
             if (Vector3.Angle(sensorPoint.transform.forward, directionToTarget) < viewAngle / 2)
             {
@@ -561,7 +621,6 @@ public abstract class AITank : MonoBehaviour
                     }
                 }
             }
-
         }
 
         for (int i = 0; i < consumableInViewRadius.Length; i++)
@@ -570,20 +629,18 @@ public abstract class AITank : MonoBehaviour
 
             Vector3 directionToTarget = (target.transform.position - sensorPoint.transform.position).normalized;
 
-
             if (Vector3.Angle(sensorPoint.transform.forward, directionToTarget) < viewAngle / 2)
             {
                 float distanceToTarget = Vector3.Distance(sensorPoint.transform.position, target.transform.position);
 
                 if (!Physics.Raycast(sensorPoint.transform.position, directionToTarget, distanceToTarget, obstacleMask))
                 {
-                    if (target != this.gameObject && !targetsFound.ContainsKey(target))
+                    if (target != this.gameObject && !consumablesFound.ContainsKey(target))
                     {
                         consumablesFound.Add(target, distanceToTarget);
                     }
                 }
             }
-
         }
 
         for (int i = 0; i < baseInViewRadius.Length; i++)
@@ -592,23 +649,21 @@ public abstract class AITank : MonoBehaviour
 
             Vector3 directionToTarget = (target.transform.position - sensorPoint.transform.position).normalized;
 
-
             if (Vector3.Angle(sensorPoint.transform.forward, directionToTarget) < viewAngle / 2)
             {
                 float distanceToTarget = Vector3.Distance(sensorPoint.transform.position, target.transform.position);
                 if (!Physics.Raycast(sensorPoint.transform.position, directionToTarget, distanceToTarget, obstacleMask))
                 {
-                    if (target != this.gameObject && !targetsFound.ContainsKey(target) && !myBases.Contains(target))
+                    if (target != this.gameObject && !basesFound.ContainsKey(target) && !myBases.Contains(target))
                     {
                         basesFound.Add(target, distanceToTarget);
                     }
                 }
             }
-
         }
     }
 
-    public Vector3 DirectionFromAngle(float angleInDegrees, bool angleIsGlobal)
+    private Vector3 DirectionFromAngle(float angleInDegrees, bool angleIsGlobal)
     {
         if (!angleIsGlobal)
         {
@@ -618,11 +673,13 @@ public abstract class AITank : MonoBehaviour
         return new Vector3(Mathf.Sin(angleInDegrees * Mathf.Deg2Rad), 0, Mathf.Cos(angleInDegrees * Mathf.Deg2Rad));
     }
 
+    /// <summary>
+    /// Visuals and Gizmos
+    /// </summary>
     private void OnDrawGizmos()
     {
         if (sensorPoint != null)
         {
-
             Handles.color = Color.white;
 
             Vector3 sensorAngleA = DirectionFromAngle(-viewAngle / 2, false);
@@ -632,6 +689,8 @@ public abstract class AITank : MonoBehaviour
             Handles.DrawLine(sensorPoint.transform.position, sensorPoint.transform.position + sensorAngleB * viewRadius);
 
             Handles.color = Color.red;
+
+
             foreach (KeyValuePair<GameObject, float> item in targetsFound)
             {
                 if (item.Key != null)
@@ -639,8 +698,6 @@ public abstract class AITank : MonoBehaviour
                     Handles.DrawLine(sensorPoint.transform.position, item.Key.transform.position);
                 }
             }
-
-
 
             Handles.color = Color.green;
 
@@ -652,9 +709,6 @@ public abstract class AITank : MonoBehaviour
                     Handles.DrawLine(sensorPoint.transform.position, item.Key.transform.position);
                 }
             }
-
-
-
 
             Handles.color = Color.blue;
 
@@ -668,21 +722,17 @@ public abstract class AITank : MonoBehaviour
             }
         }
 
-
-
         foreach (Vector3 node in pathFound)
         {
            
             Gizmos.color = Color.black;
             Gizmos.DrawCube(node, new Vector3(3 * 0.9f, 0.1f, 3 * 0.9f));
         }
-
-
-
     }
 
-
-
+    /// <summary>
+    /// Returns if the tank is firing.
+    /// </summary>
     public bool IsFiring
     {
         get
@@ -691,6 +741,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns if the tank is destroyed.
+    /// </summary>
     public bool IsDestroyed
     {
         get
@@ -699,6 +752,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns float value of remaining health.
+    /// </summary>
     public float GetHealth
     {
         get
@@ -707,6 +763,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns float value of remaining ammo.
+    /// </summary>
     public float GetAmmo
     {
         get
@@ -715,7 +774,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
-
+    /// <summary>
+    /// Returns float value of remaining fuel.
+    /// </summary>
     public float GetFuel
     {
         get
@@ -724,6 +785,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns list of friendly bases.
+    /// </summary>
     public List<GameObject> GetMyBases
     {
         get
@@ -732,6 +796,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns Dictionary(GameObject target, float distance) of visible targets (tanks in TankMain LayerMask).
+    /// </summary>
     public Dictionary<GameObject, float> GetTargetsFound
     {
         get
@@ -740,6 +807,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns Dictionary(GameObject consumable, float distance) of visible consumables (consumables in Consumable LayerMask).
+    /// </summary>
     public Dictionary<GameObject, float> GetConsumablesFound
     {
         get
@@ -748,6 +818,9 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Returns Dictionary(GameObject base, float distance) of visible enemy bases (bases in Base LayerMask).
+    /// </summary>
     public Dictionary<GameObject, float> GetBasesFound
     {
         get
@@ -756,10 +829,19 @@ public abstract class AITank : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Start function.
+    /// </summary>
     public abstract void AITankStart();
 
-
+    /// <summary>
+    /// Update function.
+    /// </summary>
     public abstract void AITankUpdate();
+
+    /// <summary>
+    /// OnCollisionEnter function
+    /// </summary>
     public abstract void AIOnCollisionEnter(Collision collision);
 
 
